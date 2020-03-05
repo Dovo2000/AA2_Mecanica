@@ -18,6 +18,8 @@ namespace LilSpheres {
 	extern void updateParticles(int startIdx, int count, float* array_data);
 }
 namespace Sphere {
+	float _radius = 1.f;
+	glm::vec3 centerPos(0.f, 1.f, 0.f);
 	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
 }
 
@@ -45,6 +47,7 @@ namespace {
 }
 
 bool show_test_window = false;
+extern bool renderSphere;
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
@@ -62,7 +65,11 @@ void GUI() {
 		ImGui::SliderFloat("Cone", &p_pars.coneRad, 0.f, 2.f);
 		ImGui::SliderInt("Emission Rate", &s_PS.emisionRate, 1, 100);
 		ImGui::SliderInt("Emission Type", &s_PS.emissionType, 0, 1);
-		//ImGui::Button("Fountain");
+		ImGui::Checkbox("Render Sphere", &renderSphere);
+		ImGui::SliderFloat("Sphere Pos X", &Sphere::centerPos.x, -5 , 5);
+		ImGui::SliderFloat("Sphere Pos Y", &Sphere::centerPos.y, 0, 10);
+		ImGui::SliderFloat("Sphere Pos Z", &Sphere::centerPos.z, -5, 5);
+		ImGui::SliderFloat("Sphere Radius", &Sphere::_radius, 0.1f, 2.f);
 	}
 	
 	ImGui::End();
@@ -72,8 +79,9 @@ float spawnTime = 0.5f, currentTime = 0.0f;
 
 void PhysicsInit() {
 	//Exemple_PhysicsInit();
-	p_pars.dir.x = p_pars.dir.y = p_pars.dir.z = 1.f;
-	p_pars.pos.x = p_pars.pos.z = 0.f;
+	p_pars.dir.x = p_pars.dir.y = p_pars.dir.z = 0.f;
+	p_pars.pos.x = -4.5f;
+	p_pars.pos.z = 0.f;
 	p_pars.pos.y = 5.f;
 	s_PS.numParticles = 0;
 	s_PS.lifeTime = 5.f;
@@ -81,7 +89,7 @@ void PhysicsInit() {
 	s_PS.emisionRate = 1;
 	s_PS.acceleration = glm::vec3(0.0f, -9.81f, 0.0f);
 	extern bool renderParticles; renderParticles = true;
-	extern bool renderSphere; renderSphere = true;
+	renderSphere = true;
 	LilSpheres::firstParticleIdx = 0;
 	LilSpheres::particleCount = s_PS.numParticles;
 }
@@ -104,10 +112,28 @@ void collisionVox(glm::vec3 &pos, glm::vec3 &vel, float dt)				//FALTA ELASTICID
 		vel.z = -vel.z;
 		pos.z += vel.z * dt;
 	}
-
 }
 
-void collisionSphere(glm::vec3 &pos, glm::vec3 &vel, float dt);
+void collisionSphere(glm::vec3 &pos, glm::vec3 &vel)
+{
+	if ((sqrt(pow(pos.x - Sphere::centerPos.x, 2) + pow(pos.y - Sphere::centerPos.y, 2) + pow(pos.z - Sphere::centerPos.z, 2)) - Sphere::_radius) < 0.f)
+	{
+		float a = pow(vel.x, 2) + pow(vel.y, 2) + pow(vel.z, 2);
+		float b = (2 * (pos.x - Sphere::centerPos.x) * vel.x) + (2 * (pos.y - Sphere::centerPos.y) * vel.y) + (2 * (pos.z - Sphere::centerPos.z) * vel.z);
+		float c = pow(pos.x - Sphere::centerPos.x, 2) + pow(pos.y - Sphere::centerPos.y, 2) + pow(pos.z - Sphere::centerPos.z, 2) - pow(Sphere::_radius, 2);
+		float var1 = (-b + sqrt(pow(b, 2) - 4 * a * c)) / (2 * a);
+		float var2 = (-b - sqrt(pow(b, 2) - 4 * a * c)) / (2 * a);
+		glm::vec3 inter;
+
+		inter = var1 < var2 ? pos + vel * var1 : pos + vel * var2;
+
+		glm::vec3 sphereNormal = (inter - Sphere::centerPos) / Sphere::_radius;
+
+		float D = -(sphereNormal.x * pos.x + sphereNormal.y * pos.y + sphereNormal.z * pos.z);
+		pos = pos - 2.f * ((sphereNormal.x * pos.x + sphereNormal.y * pos.y + sphereNormal.z * pos.z) + D) * sphereNormal;
+		vel = vel - 2.f * (sphereNormal.x * vel.x + sphereNormal.y * vel.y + sphereNormal.z * vel.z) * sphereNormal;
+	}
+}
 
 void PhysicsUpdate(float dt) {
 	s_PS.accTime += dt;
@@ -134,7 +160,7 @@ void PhysicsUpdate(float dt) {
 		s_PS.position[i] += s_PS.velocity[i] * dt;
 		s_PS.velocity[i] += s_PS.acceleration * dt;
 		collisionVox(s_PS.position[i], s_PS.velocity[i], dt);
-		
+		if(renderSphere) collisionSphere(s_PS.position[i], s_PS.velocity[i]);
 		if (ImGui::GetTime() - s_PS.startTime[i] >= s_PS.lifeTime)
 		{
 			s_PS.position.erase(s_PS.position.begin() + i);
@@ -147,6 +173,7 @@ void PhysicsUpdate(float dt) {
 	if(s_PS.numParticles > 0)
 		LilSpheres::updateParticles(LilSpheres::firstParticleIdx, s_PS.numParticles, &s_PS.position[0].x);
 	LilSpheres::particleCount = s_PS.numParticles;
+	if (renderSphere) Sphere::updateSphere(Sphere::centerPos, Sphere::_radius);
 	//glm::vec4 plano(Ax,By,Cz,D);
 	//Planos: x + D = 0,-x + D = 0,y + D = 0,-y + D = 0,z + D = 0,-z + D = 0
 }
