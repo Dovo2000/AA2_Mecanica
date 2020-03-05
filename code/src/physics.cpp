@@ -17,6 +17,9 @@ namespace LilSpheres {
 	extern int particleCount;
 	extern void updateParticles(int startIdx, int count, float* array_data);
 }
+namespace Sphere {
+	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
+}
 
 namespace {
 	static struct PhysParams {
@@ -63,6 +66,7 @@ void PhysicsInit() {
 	s_PS.emisionRate = 100.0f;
 	s_PS.acceleration = glm::vec3(0.0f, -9.81f, 0.0f);
 	extern bool renderParticles; renderParticles = true;
+	extern bool renderSphere; renderSphere = true;
 	LilSpheres::firstParticleIdx = 0;
 	LilSpheres::particleCount = s_PS.numParticles;
 }
@@ -87,6 +91,8 @@ void collisionVox(glm::vec3 &pos, glm::vec3 &vel, float dt)				//FALTA ELASTICID
 	}
 
 }
+
+void collisionSphere(glm::vec3 &pos, glm::vec3 &vel, float dt);
 
 void PhysicsUpdate(float dt) {
 	s_PS.accTime += dt;
@@ -138,10 +144,6 @@ void PhysicsUpdate(float dt) {
 	//glm::vec4 plano(Ax,By,Cz,D);
 	//Planos: x + D = 0,-x + D = 0,y + D = 0,-y + D = 0,z + D = 0,-z + D = 0
 }
-/*				s_PS.position[i] = glm::vec3(0.f, 7.f, 3.f);
-				s_PS.velocity[i] = glm::vec3((float)rand() / (RAND_MAX / (p_pars.max - p_pars.min)), (float)rand() / (RAND_MAX / (p_pars.max - p_pars.min)), (float)rand() / (RAND_MAX / (p_pars.max - p_pars.min)));
-				s_PS.startTime[i] = ImGui::GetTime();
-				*/
 
 void PhysicsCleanup() {
 	Exemple_PhysicsCleanup();
