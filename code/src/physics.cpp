@@ -22,6 +22,12 @@ namespace Sphere {
 	glm::vec3 centerPos(0.f, 1.f, 0.f);
 	extern void updateSphere(glm::vec3 pos, float radius = 1.f);
 }
+namespace Capsule {
+	float _radius = 1.f;
+	glm::vec3 posA(-3.f, 2.f, -2.f);
+	glm::vec3 posB(-4.f, 2.f, 2.f);
+	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius = 1.f);
+}
 
 namespace {
 	static struct PhysParams {
@@ -48,6 +54,7 @@ namespace {
 
 bool show_test_window = false;
 extern bool renderSphere;
+extern bool renderCapsule;
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
@@ -63,13 +70,23 @@ void GUI() {
 		ImGui::SliderFloat("PosY", &p_pars.pos.y, 1.f, 9.f);
 		ImGui::SliderFloat("PosZ", &p_pars.pos.z, -4.f, 4.f);
 		ImGui::SliderFloat("Cone", &p_pars.coneRad, 0.f, 2.f);
-		ImGui::SliderInt("Emission Rate", &s_PS.emisionRate, 1, 100);
+		ImGui::SliderInt("Emission Rate", &s_PS.emisionRate, 1, 30);
 		ImGui::SliderInt("Emission Type", &s_PS.emissionType, 0, 1);
+		ImGui::Spacing();
 		ImGui::Checkbox("Render Sphere", &renderSphere);
 		ImGui::SliderFloat("Sphere Pos X", &Sphere::centerPos.x, -5 , 5);
 		ImGui::SliderFloat("Sphere Pos Y", &Sphere::centerPos.y, 0, 10);
 		ImGui::SliderFloat("Sphere Pos Z", &Sphere::centerPos.z, -5, 5);
 		ImGui::SliderFloat("Sphere Radius", &Sphere::_radius, 0.1f, 2.f);
+		ImGui::Spacing();
+		ImGui::Checkbox("Render Capsule", &renderCapsule);
+		ImGui::SliderFloat("Capsule PosA X", &Capsule::posA.x, -5, 5);
+		ImGui::SliderFloat("Capsule PosA Y", &Capsule::posA.y, -5, 5);
+		ImGui::SliderFloat("Capsule PosA Z", &Capsule::posA.z, -5, 5);
+		ImGui::SliderFloat("Capsule PosB X", &Capsule::posB.x, -5, 5);
+		ImGui::SliderFloat("Capsule PosB Y", &Capsule::posB.y, -5, 5);
+		ImGui::SliderFloat("Capsule PosB Z", &Capsule::posB.z, -5, 5);
+		ImGui::SliderFloat("Radius", &Capsule::_radius, 0.1f, 3.f);
 	}
 	
 	ImGui::End();
@@ -89,7 +106,8 @@ void PhysicsInit() {
 	s_PS.emisionRate = 1;
 	s_PS.acceleration = glm::vec3(0.0f, -9.81f, 0.0f);
 	extern bool renderParticles; renderParticles = true;
-	renderSphere = true;
+	renderSphere = false;
+	renderCapsule = true;
 	LilSpheres::firstParticleIdx = 0;
 	LilSpheres::particleCount = s_PS.numParticles;
 }
@@ -130,8 +148,30 @@ void collisionSphere(glm::vec3 &pos, glm::vec3 &vel)
 		glm::vec3 sphereNormal = (inter - Sphere::centerPos) / Sphere::_radius;
 
 		float D = -(sphereNormal.x * pos.x + sphereNormal.y * pos.y + sphereNormal.z * pos.z);
-		pos = pos - 2.f * ((sphereNormal.x * pos.x + sphereNormal.y * pos.y + sphereNormal.z * pos.z) + D) * sphereNormal;
-		vel = vel - 2.f * (sphereNormal.x * vel.x + sphereNormal.y * vel.y + sphereNormal.z * vel.z) * sphereNormal;
+		pos = pos - 2.f * (dot(sphereNormal, pos) + D) * sphereNormal;
+		vel = vel - 2.f * (dot(sphereNormal, vel)) * sphereNormal;
+	}
+}
+
+void collisionCapsule(glm::vec3 &pos, glm::vec3 &vel)
+{
+	glm::vec3 closestPoint = Capsule::posA + 
+							(glm::clamp(
+								glm::dot(pos - Capsule::posA, Capsule::posB - Capsule::posA) / 
+								pow(glm::sqrt(
+									pow(Capsule::posB.x - Capsule::posA.x, 2) + 
+									pow(Capsule::posB.y - Capsule::posA.y, 2) + 
+									pow(Capsule::posB.z - Capsule::posA.z, 2)), 2),0.f,1.f)) * 
+								(Capsule::posB - Capsule::posA);
+	float distanceCilindre = sqrt(pow(pos.x - closestPoint.x, 2) + pow(pos.y - closestPoint.y, 2) + pow(pos.z - closestPoint.z, 2)) - Capsule::_radius;
+
+	if (distanceCilindre <= 0)
+	{
+		glm::vec3 normVec = glm::normalize(pos - closestPoint);
+		glm::vec3 point = closestPoint + normVec * Capsule::_radius;
+		float D = -(normVec.x * point.x) - (normVec.y * point.y) - (normVec.z * point.z);
+		pos = pos - 2 * (dot(normVec, pos) + D) * normVec;
+		vel = vel - 2 * (dot(normVec, vel)) * normVec;
 	}
 }
 
@@ -161,6 +201,7 @@ void PhysicsUpdate(float dt) {
 		s_PS.velocity[i] += s_PS.acceleration * dt;
 		collisionVox(s_PS.position[i], s_PS.velocity[i], dt);
 		if(renderSphere) collisionSphere(s_PS.position[i], s_PS.velocity[i]);
+		if (renderCapsule) collisionCapsule(s_PS.position[i], s_PS.velocity[i]);
 		if (ImGui::GetTime() - s_PS.startTime[i] >= s_PS.lifeTime)
 		{
 			s_PS.position.erase(s_PS.position.begin() + i);
@@ -174,6 +215,7 @@ void PhysicsUpdate(float dt) {
 		LilSpheres::updateParticles(LilSpheres::firstParticleIdx, s_PS.numParticles, &s_PS.position[0].x);
 	LilSpheres::particleCount = s_PS.numParticles;
 	if (renderSphere) Sphere::updateSphere(Sphere::centerPos, Sphere::_radius);
+	if (renderCapsule) Capsule::updateCapsule(Capsule::posA, Capsule::posB, Capsule::_radius);
 	//glm::vec4 plano(Ax,By,Cz,D);
 	//Planos: x + D = 0,-x + D = 0,y + D = 0,-y + D = 0,z + D = 0,-z + D = 0
 }
