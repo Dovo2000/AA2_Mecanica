@@ -28,6 +28,21 @@ namespace Capsule {
 	glm::vec3 posB(-4.f, 2.f, 2.f);
 	extern void updateCapsule(glm::vec3 posA, glm::vec3 posB, float radius = 1.f);
 }
+namespace Box {
+	glm::vec3 normalUp(0, -1, 0);
+	glm::vec3 normalDown(0, 1, 0);
+	glm::vec3 normalRight(-1, 0, 0);
+	glm::vec3 normalLeft(1, 0, 0);
+	glm::vec3 normalBack(0, 0, 1);
+	glm::vec3 normalFront(0, 0, -1);
+
+	float dUp = -glm::dot(normalUp, glm::vec3(0, 10, 0));
+	float dDown = -glm::dot(normalDown, glm::vec3(0, 0, 0));
+	float dLeft = -glm::dot(normalLeft, glm::vec3(-5, 0, 0));
+	float dRight = -glm::dot(normalRight, glm::vec3(5, 0, 0));
+	float dBack = -glm::dot(normalBack, glm::vec3(0, 0, -5));
+	float dFront = -glm::dot(normalFront, glm::vec3(0, 0, 5));
+}
 
 namespace {
 	static struct PhysParams {
@@ -112,23 +127,57 @@ void PhysicsInit() {
 	LilSpheres::particleCount = s_PS.numParticles;
 }
 
-
-void collisionVox(glm::vec3 &pos, glm::vec3 &vel, float dt)				//FALTA ELASTICIDAD
+void pointPlaneCollision(glm::vec3 norm, glm::vec3 &pos, glm::vec3 &vel)
 {
-	if (pos.x <= -5.f || pos.x >= 5.f)
+	float D = -glm::dot(norm, pos);
+
+	pos = pos - 2 * (dot(norm, pos) + D) * norm;
+	vel = vel - 2.f * (dot(norm, vel)) * norm;
+}
+void pointPlaneCollision(glm::vec3 norm, glm::vec3 &pos, glm::vec3 &vel, float D)	//Por si ya tenemos el valor independiente del plano, como en el caso del cubo que se calcula antes
+{
+	pos = pos - 2 * (dot(norm, pos) + D) * norm;
+	vel = vel - 2.f * (dot(norm, vel)) * norm;
+}
+
+void collisionBox(glm::vec3 &pos, glm::vec3 &vel, float dt)				//FALTA ELASTICIDAD
+{
+	float distanceUp = (dot(Box::normalUp, pos) + Box::dUp) / sqrt(pow(Box::normalUp.x, 2) + pow(Box::normalUp.y, 2) + pow(Box::normalUp.z, 2));
+	//distanceUp = distanceUp < 0 ? distanceUp * -1 : distanceUp;
+	float distanceDown = (dot(Box::normalDown, pos) + Box::dDown) / sqrt(pow(Box::normalDown.x, 2) + pow(Box::normalDown.y, 2) + pow(Box::normalDown.z, 2));
+	//distanceDown = distanceDown < 0 ? distanceDown * -1 : distanceDown;
+	float distanceLeft = (dot(Box::normalLeft, pos) + Box::dLeft) / sqrt(pow(Box::normalLeft.x, 2) + pow(Box::normalLeft.y, 2) + pow(Box::normalLeft.z, 2));
+	//distanceLeft = distanceLeft < 0 ? distanceLeft * -1 : distanceLeft;
+	float distanceRight = (dot(Box::normalRight, pos) + Box::dRight) / sqrt(pow(Box::normalRight.x, 2) + pow(Box::normalRight.y, 2) + pow(Box::normalRight.z, 2));
+	//distanceRight = distanceRight < 0 ? distanceRight * -1 : distanceRight;
+	float distanceBack = (dot(Box::normalBack, pos) + Box::dBack) / sqrt(pow(Box::normalBack.x, 2) + pow(Box::normalBack.y, 2) + pow(Box::normalBack.z, 2));
+	//distanceBack = distanceBack < 0 ? distanceBack * -1 : distanceBack;
+	float distanceFront = (dot(Box::normalFront, pos) + Box::dFront) / sqrt(pow(Box::normalFront.x, 2) + pow(Box::normalFront.y, 2) + pow(Box::normalFront.z, 2));
+	//distanceFront = distanceFront < 0 ? distanceFront * -1 : distanceFront;
+
+	if (distanceDown <= 0)
 	{
-		vel.x = -vel.x;
-		pos.x += vel.x * dt;
+		pointPlaneCollision(Box::normalDown, pos, vel, Box::dDown);
 	}
-	else if (pos.y <= 0.f || pos.y >= 10.f)
+	if (distanceUp <= 0)
 	{
-		vel.y = -vel.y;
-		pos.y += vel.y * dt;
+		pointPlaneCollision(Box::normalUp, pos, vel, Box::dUp);
 	}
-	else if (pos.z <= -5.f || pos.z >= 5.f)
+	if (distanceLeft <= 0)
 	{
-		vel.z = -vel.z;
-		pos.z += vel.z * dt;
+		pointPlaneCollision(Box::normalLeft, pos, vel, Box::dLeft);
+	}
+	if (distanceRight <= 0)
+	{
+		pointPlaneCollision(Box::normalRight, pos, vel, Box::dRight);
+	}
+	if (distanceFront <= 0)
+	{
+		pointPlaneCollision(Box::normalFront, pos, vel, Box::dFront);
+	}
+	if (distanceBack <= 0)
+	{
+		pointPlaneCollision(Box::normalBack, pos, vel, Box::dBack);
 	}
 }
 
@@ -147,9 +196,7 @@ void collisionSphere(glm::vec3 &pos, glm::vec3 &vel)
 
 		glm::vec3 sphereNormal = (inter - Sphere::centerPos) / Sphere::_radius;
 
-		float D = -(sphereNormal.x * pos.x + sphereNormal.y * pos.y + sphereNormal.z * pos.z);
-		pos = pos - 2.f * (dot(sphereNormal, pos) + D) * sphereNormal;
-		vel = vel - 2.f * (dot(sphereNormal, vel)) * sphereNormal;
+		pointPlaneCollision(sphereNormal, pos, vel);
 	}
 }
 
@@ -169,9 +216,8 @@ void collisionCapsule(glm::vec3 &pos, glm::vec3 &vel)
 	{
 		glm::vec3 normVec = glm::normalize(pos - closestPoint);
 		glm::vec3 point = closestPoint + normVec * Capsule::_radius;
-		float D = -(normVec.x * point.x) - (normVec.y * point.y) - (normVec.z * point.z);
-		pos = pos - 2 * (dot(normVec, pos) + D) * normVec;
-		vel = vel - 2 * (dot(normVec, vel)) * normVec;
+
+		pointPlaneCollision(normVec, pos, vel);
 	}
 }
 
@@ -199,7 +245,7 @@ void PhysicsUpdate(float dt) {
 	{
 		s_PS.position[i] += s_PS.velocity[i] * dt;
 		s_PS.velocity[i] += s_PS.acceleration * dt;
-		collisionVox(s_PS.position[i], s_PS.velocity[i], dt);
+		collisionBox(s_PS.position[i], s_PS.velocity[i], dt);
 		if(renderSphere) collisionSphere(s_PS.position[i], s_PS.velocity[i]);
 		if (renderCapsule) collisionCapsule(s_PS.position[i], s_PS.velocity[i]);
 		if (ImGui::GetTime() - s_PS.startTime[i] >= s_PS.lifeTime)
