@@ -78,9 +78,9 @@ void GUI() {
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 		ImGui::SliderFloat("Min", &p_pars.min, 0.f, 5.f);
 		ImGui::SliderFloat("Max", &p_pars.max, 6.f, 10.f);
-		ImGui::SliderFloat("DirX", &p_pars.dir.x, -4.f, 4.f);
-		ImGui::SliderFloat("DirY", &p_pars.dir.y, 1.f, 9.f);
-		ImGui::SliderFloat("DirZ", &p_pars.dir.z, -4.f, 4.f);
+		ImGui::SliderFloat("DirX", &p_pars.dir.x, -1.f, 1.f);
+		ImGui::SliderFloat("DirY", &p_pars.dir.y, -1.f, 1.f);
+		ImGui::SliderFloat("DirZ", &p_pars.dir.z, -1.f, 1.f);
 		ImGui::SliderFloat("PosX", &p_pars.pos.x, -4.f, 4.f);
 		ImGui::SliderFloat("PosY", &p_pars.pos.y, 1.f, 9.f);
 		ImGui::SliderFloat("PosZ", &p_pars.pos.z, -4.f, 4.f);
@@ -229,7 +229,7 @@ void PhysicsUpdate(float dt) {
 		if (s_PS.emissionType == 0)
 		{
 			s_PS.position.push_back(p_pars.pos);
-			s_PS.velocity.push_back(p_pars.dir + (float)rand() / (RAND_MAX / (p_pars.coneRad*2) - p_pars.coneRad));
+			s_PS.velocity.push_back(p_pars.dir + ((float)rand() / (RAND_MAX / (p_pars.coneRad*2) - p_pars.coneRad)));
 			s_PS.startTime.push_back(ImGui::GetTime());
 			s_PS.accTime = 0;
 		}
