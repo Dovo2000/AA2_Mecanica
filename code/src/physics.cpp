@@ -48,7 +48,6 @@ namespace {
 	static struct PhysParams {
 		float min = 0.f;
 		float max = 10.f;
-		float buttonTam = 3.f;
 		float coneRad = 0.f;
 		glm::vec3 dir, pos;
 	} p_pars;
@@ -70,22 +69,27 @@ namespace {
 bool show_test_window = false;
 extern bool renderSphere;
 extern bool renderCapsule;
+bool clear = false;
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Physics Parameters", &show, 0);
 
 	{	
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+		ImGui::Spacing();
+		ImGui::Checkbox("Clear window", &clear);
+		ImGui::SliderFloat("Particle Life Time", &s_PS.lifeTime, 0.f, 10.f);
+		ImGui::Spacing();
 		ImGui::SliderFloat("Min", &p_pars.min, 0.f, 5.f);
 		ImGui::SliderFloat("Max", &p_pars.max, 6.f, 10.f);
-		ImGui::SliderFloat("DirX", &p_pars.dir.x, -1.f, 1.f);
-		ImGui::SliderFloat("DirY", &p_pars.dir.y, -1.f, 1.f);
-		ImGui::SliderFloat("DirZ", &p_pars.dir.z, -1.f, 1.f);
+		ImGui::SliderFloat("DirX", &p_pars.dir.x, -2.f, 2.f);
+		ImGui::SliderFloat("DirY", &p_pars.dir.y, -2.f, 2.f);
+		ImGui::SliderFloat("DirZ", &p_pars.dir.z, -2.f, 2.f);
 		ImGui::SliderFloat("PosX", &p_pars.pos.x, -4.f, 4.f);
 		ImGui::SliderFloat("PosY", &p_pars.pos.y, 1.f, 9.f);
 		ImGui::SliderFloat("PosZ", &p_pars.pos.z, -4.f, 4.f);
 		ImGui::SliderFloat("Cone", &p_pars.coneRad, 0.f, 2.f);
-		ImGui::SliderInt("Emission Rate", &s_PS.emisionRate, 1, 30);
+		ImGui::SliderInt("Emission Rate", &s_PS.emisionRate, 1, 100);
 		ImGui::SliderInt("Emission Type", &s_PS.emissionType, 0, 1);
 		ImGui::Spacing();
 		ImGui::Checkbox("Render Sphere", &renderSphere);
@@ -96,10 +100,10 @@ void GUI() {
 		ImGui::Spacing();
 		ImGui::Checkbox("Render Capsule", &renderCapsule);
 		ImGui::SliderFloat("Capsule PosA X", &Capsule::posA.x, -5, 5);
-		ImGui::SliderFloat("Capsule PosA Y", &Capsule::posA.y, -5, 5);
+		ImGui::SliderFloat("Capsule PosA Y", &Capsule::posA.y,  0, 10);
 		ImGui::SliderFloat("Capsule PosA Z", &Capsule::posA.z, -5, 5);
 		ImGui::SliderFloat("Capsule PosB X", &Capsule::posB.x, -5, 5);
-		ImGui::SliderFloat("Capsule PosB Y", &Capsule::posB.y, -5, 5);
+		ImGui::SliderFloat("Capsule PosB Y", &Capsule::posB.y,  0, 10);
 		ImGui::SliderFloat("Capsule PosB Z", &Capsule::posB.z, -5, 5);
 		ImGui::SliderFloat("Radius", &Capsule::_radius, 0.1f, 3.f);
 	}
@@ -112,7 +116,7 @@ float spawnTime = 0.5f, currentTime = 0.0f;
 void PhysicsInit() {
 	//Exemple_PhysicsInit();
 	p_pars.dir.x = p_pars.dir.y = p_pars.dir.z = 0.f;
-	p_pars.pos.x = -4.5f;
+	p_pars.pos.x = 0.f;
 	p_pars.pos.z = 0.f;
 	p_pars.pos.y = 5.f;
 	s_PS.numParticles = 0;
@@ -122,7 +126,7 @@ void PhysicsInit() {
 	s_PS.acceleration = glm::vec3(0.0f, -9.81f, 0.0f);
 	extern bool renderParticles; renderParticles = true;
 	renderSphere = false;
-	renderCapsule = true;
+	renderCapsule = false;
 	LilSpheres::firstParticleIdx = 0;
 	LilSpheres::particleCount = s_PS.numParticles;
 }
@@ -221,6 +225,13 @@ void collisionCapsule(glm::vec3 &pos, glm::vec3 &vel)
 	}
 }
 
+void PhysicsCleanup() {
+	s_PS.position.clear();
+	s_PS.velocity.clear();
+	s_PS.startTime.clear();
+	s_PS.numParticles = 0;
+}
+
 void PhysicsUpdate(float dt) {
 	s_PS.accTime += dt;
 	if ((s_PS.accTime * s_PS.emisionRate) >= 1)
@@ -262,10 +273,11 @@ void PhysicsUpdate(float dt) {
 	LilSpheres::particleCount = s_PS.numParticles;
 	if (renderSphere) Sphere::updateSphere(Sphere::centerPos, Sphere::_radius);
 	if (renderCapsule) Capsule::updateCapsule(Capsule::posA, Capsule::posB, Capsule::_radius);
-	//glm::vec4 plano(Ax,By,Cz,D);
-	//Planos: x + D = 0,-x + D = 0,y + D = 0,-y + D = 0,z + D = 0,-z + D = 0
+	if (clear)
+	{
+		PhysicsCleanup();
+		clear = !clear;
+	}
 }
 
-void PhysicsCleanup() {
-	Exemple_PhysicsCleanup();
-}
+
